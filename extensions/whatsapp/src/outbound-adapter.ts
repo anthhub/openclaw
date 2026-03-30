@@ -10,8 +10,19 @@ import {
 } from "openclaw/plugin-sdk/reply-payload";
 import { chunkText } from "openclaw/plugin-sdk/reply-runtime";
 import { shouldLogVerbose } from "openclaw/plugin-sdk/runtime-env";
+import { toWhatsappJid } from "openclaw/plugin-sdk/text-runtime";
+import type { QuotedMessageKey } from "./active-listener.js";
 import { resolveWhatsAppOutboundTarget } from "./runtime-api.js";
 import { sendMessageWhatsApp, sendPollWhatsApp } from "./send.js";
+
+function buildQuotedMessageKeyFromReplyToId(
+  replyToId: string | null | undefined,
+  to: string,
+): QuotedMessageKey | undefined {
+  const id = replyToId?.trim();
+  if (!id) return undefined;
+  return { id, remoteJid: toWhatsappJid(to), fromMe: false };
+}
 
 function trimLeadingWhitespace(text: string | undefined): string {
   return text?.trimStart() ?? "";
@@ -45,7 +56,7 @@ export const whatsappOutbound: ChannelOutboundAdapter = {
   },
   ...createAttachedChannelResultAdapter({
     channel: "whatsapp",
-    sendText: async ({ cfg, to, text, accountId, deps, gifPlayback }) => {
+    sendText: async ({ cfg, to, text, accountId, deps, gifPlayback, replyToId }) => {
       const normalizedText = trimLeadingWhitespace(text);
       if (!normalizedText) {
         return createEmptyChannelResult("whatsapp");
@@ -58,6 +69,7 @@ export const whatsappOutbound: ChannelOutboundAdapter = {
         cfg,
         accountId: accountId ?? undefined,
         gifPlayback,
+        quotedMessageKey: buildQuotedMessageKeyFromReplyToId(replyToId, to),
       });
     },
     sendMedia: async ({
@@ -69,6 +81,7 @@ export const whatsappOutbound: ChannelOutboundAdapter = {
       accountId,
       deps,
       gifPlayback,
+      replyToId,
     }) => {
       const normalizedText = trimLeadingWhitespace(text);
       const send =
@@ -81,6 +94,7 @@ export const whatsappOutbound: ChannelOutboundAdapter = {
         mediaLocalRoots,
         accountId: accountId ?? undefined,
         gifPlayback,
+        quotedMessageKey: buildQuotedMessageKeyFromReplyToId(replyToId, to),
       });
     },
     sendPoll: async ({ cfg, to, poll, accountId }) =>
